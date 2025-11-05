@@ -170,7 +170,7 @@ if trend_level == "Product":
 
 elif trend_level == "Group":
     selected_group = st.selectbox("Select a group:", sorted(nodes["Group"].unique()))
-    group_nodes = nodes[nodes["Group"] == selected_group]["NodeIndex"].tolist()
+    group_nodes = nodes[nodes["Group"] == selected_group]["Node"].tolist()
     fig_trends = plot_product_trends(
         group_nodes, selected_vars, data_map, "Group", selected_group
     )
@@ -180,7 +180,7 @@ else:  # Sub-Group
         "Select a sub-group:", sorted(nodes["Sub-Group"].unique())
     )
     subgroup_nodes = nodes[nodes["Sub-Group"] == selected_subgroup][
-        "NodeIndex"
+        "Node"
     ].tolist()
     fig_trends = plot_product_trends(
         subgroup_nodes, selected_vars, data_map, "Sub-Group", selected_subgroup
