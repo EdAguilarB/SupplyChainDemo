@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -154,7 +152,7 @@ import plotly.express as px
 def load_and_clean(path, node_map):
     """Load temporal CSV and rename columns to node indices."""
     df = pd.read_csv(path, index_col=0).drop(columns=['POP001L12P.1'], errors='ignore')
-    df = df.rename(columns=node_map)
+    #df = df.rename(columns=node_map)
     return df
 
 
@@ -185,6 +183,7 @@ def plot_temporal_graph(
         filtered_nodes = nodes.copy()
 
     selected_node_indices = set(filtered_nodes["NodeIndex"].tolist())
+    selected_nodes = set(filtered_nodes["Node"].tolist())
 
     # --- Build NetworkX graph ---
     G = nx.Graph()
@@ -204,7 +203,7 @@ def plot_temporal_graph(
     color_map = {g: palette[i % len(palette)] for i, g in enumerate(unique_groups)}
 
     # --- Temporal data ---
-    df_time = temporal_data[selected_var].loc[:, temporal_data[selected_var].columns.isin(selected_node_indices)]
+    df_time = temporal_data[selected_var].loc[:, temporal_data[selected_var].columns.isin(selected_nodes)]
     df_time_norm = (df_time - df_time.min()) / (df_time.max() - df_time.min() + 1e-6)
     df_time_norm = df_time_norm.fillna(0)
 
@@ -345,51 +344,83 @@ def plot_temporal_graph(
 import plotly.graph_objects as go
 import streamlit as st
 
-def plot_node_predictions(node, sales, preds):
+def plot_predictions_level(sales, preds, nodes, level="Node", selection=None):
     """
-    Plot real vs predicted values for a single node with Plotly.
+    Plot real vs predicted demand over time at different levels:
+      - 'Node': individual product
+      - 'Sub-Group': sum across all nodes in the selected sub-group
+      - 'Group': sum across all nodes in the selected group
 
     Args:
-        node (str): Column name for the product/node.
-        sales (pd.DataFrame): Real demand dataframe (index = date, columns = nodes).
-        preds (pd.DataFrame): Predictions dataframe, including 'split' column.
+        sales (pd.DataFrame): True sales values (index = date, columns = node names)
+        preds (pd.DataFrame): Predicted values with 'split' column
+        nodes (pd.DataFrame): Node metadata with columns ['Node', 'Group', 'Sub-Group']
+        level (str): One of {'Node', 'Sub-Group', 'Group'}
+        selection (str): Selected entity (node, group, or sub-group)
     Returns:
-        fig (plotly.graph_objects.Figure): Plotly figure.
+        fig (plotly.graph_objects.Figure)
     """
+    # Validate
+    if level not in ["Node", "Sub-Group", "Group"]:
+        raise ValueError("Level must be 'Node', 'Sub-Group', or 'Group'.")
+
+    # --- Aggregate data depending on level ---
+    if level == "Node":
+        label = selection
+        real_series = sales[selection]
+        pred_series_train = preds.loc[preds['split'] == 'train', selection]
+        pred_series_test = preds.loc[preds['split'] == 'test', selection]
+
+    elif level == "Sub-Group":
+        subset_nodes = nodes.loc[nodes["Sub-Group"] == selection, "Node"].tolist()
+        label = f"Sub-Group: {selection}"
+        real_series = sales[subset_nodes].sum(axis=1)
+        pred_series_train = preds.loc[preds['split'] == 'train', subset_nodes].sum(axis=1)
+        pred_series_test = preds.loc[preds['split'] == 'test', subset_nodes].sum(axis=1)
+
+    elif level == "Group":
+        subset_nodes = nodes.loc[nodes["Group"] == selection, "Node"].tolist()
+        label = f"Group: {selection}"
+        real_series = sales[subset_nodes].sum(axis=1)
+        pred_series_train = preds.loc[preds['split'] == 'train', subset_nodes].sum(axis=1)
+        pred_series_test = preds.loc[preds['split'] == 'test', subset_nodes].sum(axis=1)
+
+    # --- Plot ---
     fig = go.Figure()
 
-    # Plot real values
-    fig.add_trace(
-        go.Scatter(
-            x=sales.index,
-            y=sales[node],
-            mode='lines+markers',
-            name='Real',
-            line=dict(color='black'),
-            marker=dict(size=6),
-        )
-    )
+    # Real values
+    fig.add_trace(go.Scatter(
+        x=sales.index, y=real_series,
+        mode='lines+markers', name='Real',
+        line=dict(color='black', width=2),
+        marker=dict(size=6)
+    ))
 
-    # Plot predicted values for train and test separately
-    for split in ['train', 'test']:
-        df_split = preds[preds['split'] == split]
-        fig.add_trace(
-            go.Scatter(
-                x=df_split.index,
-                y=df_split[node],
-                mode='lines+markers',
-                name=f'Predicted ({split})',
-                line=dict(color='green' if split=='train' else 'red'),
-                marker=dict(size=6),
-            )
-        )
+    # Predicted (train)
+    fig.add_trace(go.Scatter(
+        x=pred_series_train.index, y=pred_series_train,
+        mode='lines+markers', name='Predicted (train)',
+        line=dict(color='green', dash='solid'),
+        marker=dict(size=6)
+    ))
 
+    # Predicted (test)
+    fig.add_trace(go.Scatter(
+        x=pred_series_test.index, y=pred_series_test,
+        mode='lines+markers', name='Predicted (test)',
+        line=dict(color='red', dash='dot'),
+        marker=dict(size=6)
+    ))
+
+    # --- Layout ---
     fig.update_layout(
-        title=f"Real vs Predicted Demand for {node}",
+        title=f"📈 Real vs Predicted Demand ({label})",
         xaxis_title="Date",
-        yaxis_title="Value",
+        yaxis_title="Demand (weight)",
         template="plotly_white",
+        hovermode="x unified",
         legend=dict(x=0, y=1.1, orientation="h"),
-        height=500,
+        height=550,
     )
+
     return fig
