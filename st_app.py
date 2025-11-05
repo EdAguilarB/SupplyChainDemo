@@ -1,13 +1,11 @@
-import streamlit as st
+import numpy as np
 import pandas as pd
-from utils import (
-    get_group_color_map,
-    plot_subgroup_distribution,
-    plot_product_trends,
-    load_and_clean,
-    plot_temporal_graph,
-    plot_predictions_level
-)
+import streamlit as st
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+from utils import (get_group_color_map, load_and_clean, plot_predictions_level,
+                   plot_product_trends, plot_subgroup_distribution,
+                   plot_temporal_graph)
 
 # ------------------------------------------------------------
 # PAGE SETUP
@@ -29,15 +27,25 @@ Each analytical step corresponds to a different stage in data exploration and mo
 # LOAD DATA
 # ------------------------------------------------------------
 node_idx = pd.read_csv("data/raw/homogenoeus/Nodes/NodesIndex.csv")
-nodes = pd.read_csv("data/raw/homogenoeus/Nodes/Node Types (Product Group and Subgroup).csv")
+nodes = pd.read_csv(
+    "data/raw/homogenoeus/Nodes/Node Types (Product Group and Subgroup).csv"
+)
 nodes = pd.merge(left=nodes, right=node_idx, on="Node")
 node_to_idx = {node: idx for node, idx in zip(nodes["Node"], nodes["NodeIndex"])}
 
 # Temporal data sources
-delivery = load_and_clean("data/raw/homogenoeus/Temporal Data/Weight/Delivery_to_Distributor.csv", node_to_idx)
-issue = load_and_clean("data/raw/homogenoeus/Temporal Data/Weight/Factory_Issue.csv", node_to_idx)
-production = load_and_clean("data/raw/homogenoeus/Temporal Data/Weight/Production.csv", node_to_idx)
-sales = load_and_clean("data/raw/homogenoeus/Temporal Data/Weight/Sales_Order.csv", node_to_idx)
+delivery = load_and_clean(
+    "data/raw/homogenoeus/Temporal Data/Weight/Delivery_to_Distributor.csv", node_to_idx
+)
+issue = load_and_clean(
+    "data/raw/homogenoeus/Temporal Data/Weight/Factory_Issue.csv", node_to_idx
+)
+production = load_and_clean(
+    "data/raw/homogenoeus/Temporal Data/Weight/Production.csv", node_to_idx
+)
+sales = load_and_clean(
+    "data/raw/homogenoeus/Temporal Data/Weight/Sales_Order.csv", node_to_idx
+)
 
 data_map = {
     "Delivery": delivery,
@@ -55,7 +63,9 @@ num_groups = nodes["Group"].nunique()
 num_subgroups = nodes["Sub-Group"].nunique()
 
 # Load edge list for stats
-edges = pd.read_csv("data/raw/homogenoeus/Edges/EdgesIndex/Edges (Plant).csv", index_col=0)
+edges = pd.read_csv(
+    "data/raw/homogenoeus/Edges/EdgesIndex/Edges (Plant).csv", index_col=0
+)
 num_edges = edges.shape[0]
 
 # Time coverage
@@ -86,7 +96,9 @@ with st.expander("Read the paper abstract & dataset availability"):
         "are inherently graph-like. The SCG dataset was collected from a large FMCG company's central "
         "database, curated for temporal graph use, and is publicly available (DOI & GitHub)."
     )
-    st.markdown("**DOI / repository:** [SCG dataset (zenodo / GitHub)](https://doi.org/10.5281/zenodo.13652826)")
+    st.markdown(
+        "**DOI / repository:** [SCG dataset (zenodo / GitHub)](https://doi.org/10.5281/zenodo.13652826)"
+    )
 
 # ------------------------------------------------------------
 # STEP 1: PRODUCT HIERARCHY OVERVIEW
@@ -111,7 +123,9 @@ level_choice = st.radio(
 # Compute and plot
 group_order, color_map = get_group_color_map(nodes, "Group")
 level = "Group" if level_choice == "Product Group" else "Sub-Group"
-fig_hierarchy = plot_subgroup_distribution(nodes, level=level, color_map=color_map, group_order=group_order)
+fig_hierarchy = plot_subgroup_distribution(
+    nodes, level=level, color_map=color_map, group_order=group_order
+)
 st.plotly_chart(fig_hierarchy, use_container_width=True)
 
 st.info(
@@ -134,7 +148,9 @@ This helps identify **seasonal trends**, **demand–supply alignment**, or **ope
 # User inputs
 col1, col2 = st.columns([2, 2])
 with col1:
-    trend_level = st.selectbox("Select level of analysis:", ["Product", "Sub-Group", "Group"])
+    trend_level = st.selectbox(
+        "Select level of analysis:", ["Product", "Sub-Group", "Group"]
+    )
 with col2:
     selected_vars = st.multiselect(
         "Select variables to visualize:",
@@ -148,17 +164,27 @@ if trend_level == "Product":
         options=sales.columns.tolist(),
         default=[sales.columns[0]],
     )
-    fig_trends = plot_product_trends(selected_products, selected_vars, data_map, "Product", None)
+    fig_trends = plot_product_trends(
+        selected_products, selected_vars, data_map, "Product", None
+    )
 
 elif trend_level == "Group":
     selected_group = st.selectbox("Select a group:", sorted(nodes["Group"].unique()))
     group_nodes = nodes[nodes["Group"] == selected_group]["NodeIndex"].tolist()
-    fig_trends = plot_product_trends(group_nodes, selected_vars, data_map, "Group", selected_group)
+    fig_trends = plot_product_trends(
+        group_nodes, selected_vars, data_map, "Group", selected_group
+    )
 
 else:  # Sub-Group
-    selected_subgroup = st.selectbox("Select a sub-group:", sorted(nodes["Sub-Group"].unique()))
-    subgroup_nodes = nodes[nodes["Sub-Group"] == selected_subgroup]["NodeIndex"].tolist()
-    fig_trends = plot_product_trends(subgroup_nodes, selected_vars, data_map, "Sub-Group", selected_subgroup)
+    selected_subgroup = st.selectbox(
+        "Select a sub-group:", sorted(nodes["Sub-Group"].unique())
+    )
+    subgroup_nodes = nodes[nodes["Sub-Group"] == selected_subgroup][
+        "NodeIndex"
+    ].tolist()
+    fig_trends = plot_product_trends(
+        subgroup_nodes, selected_vars, data_map, "Sub-Group", selected_subgroup
+    )
 
 st.plotly_chart(fig_trends, use_container_width=True)
 st.info(
@@ -194,13 +220,18 @@ filter_mode = st.radio(
 
 selected_group, selected_subgroup = None, None
 if filter_mode == "By Product Group":
-    selected_group = st.selectbox("Choose a product group:", sorted(nodes["Group"].unique()))
+    selected_group = st.selectbox(
+        "Choose a product group:", sorted(nodes["Group"].unique())
+    )
 elif filter_mode == "By Sub-Group":
-    selected_subgroup = st.selectbox("Choose a sub-group:", sorted(nodes["Sub-Group"].unique()))
+    selected_subgroup = st.selectbox(
+        "Choose a sub-group:", sorted(nodes["Sub-Group"].unique())
+    )
 
 color_by_value = st.checkbox(
-    "🎨 Color nodes by value intensity (instead of product group)", value=False,
-    help="If enabled, nodes are colored based on the magnitude of the selected variable over time."
+    "🎨 Color nodes by value intensity (instead of product group)",
+    value=False,
+    help="If enabled, nodes are colored based on the magnitude of the selected variable over time.",
 )
 
 fig_graph = plot_temporal_graph(
@@ -222,7 +253,6 @@ if fig_graph:
     )
 else:
     st.warning("No nodes available for this selection.")
-
 
 
 # =========================================================
@@ -268,9 +298,13 @@ level = st.radio(
 if level == "Node":
     selection = st.selectbox("Select Product/Node", options=sales.columns.tolist())
 elif level == "Sub-Group":
-    selection = st.selectbox("Select Sub-Group", options=sorted(nodes["Sub-Group"].unique().tolist()))
+    selection = st.selectbox(
+        "Select Sub-Group", options=sorted(nodes["Sub-Group"].unique().tolist())
+    )
 else:
-    selection = st.selectbox("Select Group", options=sorted(nodes["Group"].unique().tolist()))
+    selection = st.selectbox(
+        "Select Group", options=sorted(nodes["Group"].unique().tolist())
+    )
 
 # ---------------------------------------------------------
 # Generate plot
@@ -281,8 +315,7 @@ st.plotly_chart(fig, use_container_width=True)
 # ---------------------------------------------------------
 # Display performance metrics (RMSE & MAE)
 # ---------------------------------------------------------
-import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+
 
 if level == "Node":
     y_true = sales[selection]
