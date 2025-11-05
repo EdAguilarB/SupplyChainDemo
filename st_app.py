@@ -80,6 +80,14 @@ The temporal dimension (daily measurements) enables the modeling of production, 
 """
 )
 
+with st.expander("Read the paper abstract & dataset availability"):
+    st.write(
+        "Graph Neural Networks (GNNs) are well-suited for supply chain problems because supply chains "
+        "are inherently graph-like. The SCG dataset was collected from a large FMCG company's central "
+        "database, curated for temporal graph use, and is publicly available (DOI & GitHub)."
+    )
+    st.markdown("**DOI / repository:** [SCG dataset (zenodo / GitHub)](https://doi.org/10.5281/zenodo.13652826)")
+
 # ------------------------------------------------------------
 # STEP 1: PRODUCT HIERARCHY OVERVIEW
 # ------------------------------------------------------------
@@ -96,7 +104,7 @@ how products are distributed across the supply chain categories.
 level_choice = st.radio(
     "Select hierarchy level:",
     options=["Product Group", "Product Sub-Group"],
-    index=1,
+    index=0,
     horizontal=True,
 )
 
